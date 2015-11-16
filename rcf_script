@@ -1,0 +1,121 @@
+#!/usr/bin/env ruby
+
+#if running this from another location, this directory definition may need to be updated
+feature_files = Dir['../**/*.feature']
+feature_description = ""
+
+scenarios = []
+counter = 0
+
+current = {} # most-recently seen attributes
+
+csv_file = "info.csv"
+
+csv=File.open(csv_file, 'w')
+
+require 'csv'
+
+#Collect execution information from user:
+button_presser = [(print 'Initials of "button presser": '), gets.rstrip][1]
+execution_date = [(print 'Date of execution: '), gets.rstrip][1]
+browser = [(print 'Browser used: '), gets.rstrip][1]
+os = [(print 'OS used: '), gets.rstrip][1]
+#reviewer = [(print 'Initials of "Reviewer": '), gets.rstrip][1]
+#review_date = [(print 'Date of Review: '), gets.rstrip][1]
+puts "Processing, please wait..."
+
+feature_files.each do |filename|
+
+  current[:tags] = ""
+  current[:filename] = filename
+  current[:feature_file] = filename.sub(%r(^features/), '') # filename relative to the features/ folder
+  current[:button_presser] = button_presser
+  current[:execution_date] = execution_date
+  current[:pass] = "Pass"
+  current[:browser] = browser
+  current[:os] = os
+  #current[:reviewer]=reviewer
+  #current[:review_date]=review_date
+  contents=File.read(filename)
+
+  ary= Array.new
+  contents.each_line do |line|
+    ary << line.strip
+  end
+
+  for index in 0 ... ary.size
+    #this section parses the tag elements of the file and stores them for later use
+    if ary[index] =~ /^[^#]*Feature:/i
+      #current[:feat_desc] = ary[index]
+      feature_description = ary[index].strip[8..-1]
+    elsif ary[index] =~ /^[^#]*@(PB|EE)/
+      #current[:pbnum] = ary[index].strip[1..-1] # drop the @PB
+      current[:feat_desc] = feature_description + " / " +  ary[index].strip[3..-1]
+    elsif ary[index] =~ /^[^#]*@release/i
+      current[:release] = ary[index].strip[8..-1] # drop the @Release
+    elsif ary[index] =~ /^[^#]*@audit/i or ary[index] =~ /^[^#]*@security/i
+      current[:ER/ES] = "(ER/ES)"
+        elsif ary[index] =~ /^[^#]*@headless/i
+      current[:headless] = "(The scenario output will be displayed in the form of a raw output response.)"
+      elsif ary[index] =~ /^[^#]*Scenario/
+      #add headless text
+      #puts scenarios.size
+      temp_scenario = ""
+
+      #build out the text that will be used for the comment column
+      #current[:comment] = current[:dropdown_tag_text].to_s + current[:audit].to_s + current[:dialogue].to_s + current[:headless].to_s + current[:email].to_s + current[:header].to_s + current[:scrolling].to_s + current[:tooltip].to_s
+      #if no comment text, don't leave blank, put "N/A"
+      if current[:comment].to_s.eql? ""
+        current[:comment] = "N/A"
+      end
+
+      #Will need to adjust this to apply tags at the top of the file to all scenarios within the file
+      #puts "start|" + ary[index] + "|end"
+      until ary[index].start_with?("Given") or ary[index].start_with?("When") or ary[index].start_with?("Then") or ary[index].start_with?("And") or ary[index].start_with?("#") do
+        temp_scenario= temp_scenario +  ary[index] + " "
+        index+=1
+        break if index == ary.size
+      end
+      current[:feat_desc].sub!(/^[^#]*Feature:/, '')
+      temp_scenario.sub!(/^[^#]*Scenario.*:/, '')
+      scenario = current.merge(:scenario => temp_scenario)
+      temp_scenario=""
+      scenarios << scenario
+      #csv.puts(CSV.generate_line(scenario.values_at(:feature_file, :feat_desc , :pbnum, :tags, :release, :scenario)))
+
+      if current[:tags].include? "@Validation"
+        if !(current[:tags].include? "@Manual") and !(current[:tags].include? "@Draft") and !(current[:tags].include? "@wip")
+          csv.puts(CSV.generate_line(scenario.values_at(:feat_desc, :scenario, :release,:button_presser,:execution_date, :pass, :browser, :os, " ", " " , :comment, :filename))) #removed :tags from last column
+          counter +=1
+        end
+      end
+
+      #reset tag values before next scenario is evaluated:
+      current[:tags] = ""
+      current[:audit] = ""
+      current[:headless] = ""
+      current[:comment] = ""
+
+    elsif (m = /^[^#]*(@Review).*(\[.+\])/i.match ary[index])
+      m.captures.each { |e| current[:tags] = current[:tags].to_s + ' ' + e.to_s }
+    elsif (m = /^[^#]*(@[A-Z][a-z]+).*/.match ary[index])
+      m.captures.each { |e| current[:tags] = current[:tags].to_s + ' ' + e.to_s }
+
+
+    end
+  end
+end
+
+#Checks for any duplicates within all scenarios
+require 'set'
+set = Set.new
+scenarios.each do |scenario|
+  puts "Scenario #{scenario} is already in your spreadsheet" unless set.add?(scenario)
+end
+
+def set_combine
+  combine = pbnum + feat_desc
+end
+csv.close
+
+STDOUT.puts "Wrote info for #{counter} scenarios to csv file #{csv_file} out of a possible #{scenarios.size} scenarios."
