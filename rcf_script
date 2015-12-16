@@ -1,3 +1,5 @@
+
+
 #!/usr/bin/env ruby
 
 #if running this from another location, this directory definition may need to be updated
@@ -54,10 +56,12 @@ feature_files.each do |filename|
     elsif ary[index] =~ /^[^#]*@release/i
       current[:release] = ary[index].strip[8..-1] # drop the @Release
     elsif ary[index] =~ /^[^#]*@audit/i or ary[index] =~ /^[^#]*@security/i
-      current[:ER/ES] = "(ER/ES)"
-        elsif ary[index] =~ /^[^#]*@headless/i
-      current[:headless] = "(The scenario output will be displayed in the form of a raw output response.)"
-      elsif ary[index] =~ /^[^#]*Scenario/
+      #current[:ER/ES] = "(ER/ES)"
+    elsif ary[index] =~ /^[^#]*@headless/i
+      #current[:headless] = "(The scenario output will be displayed in the form of a raw output response.)"
+    elsif  ary[index] =~ /^#.*/i
+      current[:comment] = ary[index][1..-1]
+    elsif ary[index] =~ /^[^#]*Scenario/
       #add headless text
       #puts scenarios.size
       temp_scenario = ""
@@ -119,3 +123,4 @@ end
 csv.close
 
 STDOUT.puts "Wrote info for #{counter} scenarios to csv file #{csv_file} out of a possible #{scenarios.size} scenarios."
+
